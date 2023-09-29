@@ -1,1 +1,1 @@
- singularity run /opt/software/lyveset/lyveset.1.1.4f.siflaunch_set.pl -ref /mnt/gs18/scratch/groups/manninglab/project_setST8/reference/campyref.fasta /mnt/gs18/scratch/groups/manninglab/project_setST8  
+ singularity run /opt/software/lyveset/lyveset.1.1.4f.siflaunch_set.pl -ref [Directory] project_setST8/reference/campyref.fasta [Directory]project_setST8  
