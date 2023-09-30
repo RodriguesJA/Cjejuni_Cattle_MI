@@ -6,7 +6,7 @@
 <a id="Software Repositories used in this project:"><a/>
 <a id="Funding Sources:"><a/>
 
-***Scripts and public data for comparative phylogenomics of *C. jejuni* between cattle and humans Rodrigues et al.**
+**Scripts and public data for comparative phylogenomics of *C. jejuni* between cattle and humans Rodrigues et al.**
 
 ## Description:
 This repository contains the scripts utilized for bioinformatics and statistical analysis associated with []().
