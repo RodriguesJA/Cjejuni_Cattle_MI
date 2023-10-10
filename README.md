@@ -13,8 +13,7 @@ This repository contains the scripts utilized for bioinformatics and statistical
 The work is a collaboration between the MDHHS and the [Manning Lab](https://manninglab.natsci.msu.edu/) at Michigan State University.
 
 ## Data Availability: 
-Sequences are available at BioProjects , and new MLSTs identified in this study have been deposited to [PubMLST](https://pubmlst.org/) with the designations of ST.
-As the publication describes, a [Microreact Link]() is available to view the phylogeographic analysis.
+*Campylobacter jejuni* sequences derived from cattle were deposited in NCBI under BioProject PRJNA1023301. BioProjects PRJNA305291, PRJNA368990, and PRJNA951423 contain *C.jejuni* sequences derived from humans. New MLSTs identified in this study have been deposited to [PubMLST](https://pubmlst.org/) with the designations of ST 13471. As the publication describes, Microreact Links are available to view the [phylogeographic analysis in Michigan]() and the [global ST-982 cg-MLST analysis](). 
 
 ## Key Features:
 - Raw Data Management
@@ -39,6 +38,7 @@ Please see the incredibly artistic flowchart below! This flowchart has a step-by
 - [FastANI](https://github.com/ParBLiSS/FastANI)
 - [FastQC](https://github.com/s-andrews/FastQC)
 - [ITOL](https://itol.embl.de/)
+- [IQTree](https://github.com/Cibiv/IQ-TREE)
 - [Lyve-SET](https://github.com/lskatz/lyve-SET)
 - [MicroReact](https://microreact.org/)
 - [MIGA](http://microbial-genomes.org/)
