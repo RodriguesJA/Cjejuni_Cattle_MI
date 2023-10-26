@@ -44,7 +44,7 @@ Please see the incredibly artistic flowchart below! This flowchart has a step-by
 - [MIGA](http://microbial-genomes.org/)
 - [MLST](https://github.com/tseemann/mlst)
 - [MultiQC](https://github.com/ewels/MultiQC)
-- [Panaroo]([https://github.com/sanger-pathogens/Roary](https://github.com/gtonkinhill/panaroo))
+- [Panaroo](https://github.com/gtonkinhill/panaroo)
 - [Prokka](https://github.com/tseemann/prokka)
 - [PubMLST](https://pubmlst.org/)
 - [QUAST](https://github.com/ablab/quast)
