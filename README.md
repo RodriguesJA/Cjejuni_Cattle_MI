@@ -48,7 +48,7 @@ Please see the incredibly artistic flowchart below! This flowchart has a step-by
 - [PubMLST](https://pubmlst.org/)
 - [QUAST](https://github.com/ablab/quast)
 - [RaXML-ng](https://github.com/amkozlov/raxml-ng)
-- [ReproTree](https://github.com/insapathogenomics/ReporTree)
+- [ReporTree](https://github.com/insapathogenomics/ReporTree)
 - [SPAdes](https://github.com/ablab/spades)
 - [SRAtools](https://github.com/ncbi/sra-tools)
 - [StarAMR](https://github.com/phac-nml/staramr)
