@@ -41,7 +41,6 @@ Please see the incredibly artistic flowchart below! This flowchart has a step-by
 - [IQTree](https://github.com/Cibiv/IQ-TREE)
 - [Lyve-SET](https://github.com/lskatz/lyve-SET)
 - [MicroReact](https://microreact.org/)
-- [MIGA](http://microbial-genomes.org/)
 - [MLST](https://github.com/tseemann/mlst)
 - [MultiQC](https://github.com/ewels/MultiQC)
 - [Panaroo](https://github.com/gtonkinhill/panaroo)
