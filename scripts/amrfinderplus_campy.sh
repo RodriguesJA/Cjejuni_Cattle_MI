@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=16 # number of CPUs (or cores) per task (same as -c)
 #SBATCH --mem=50G     # memory required per node - amount of memory (in bytes)
 #SBATCH --partition=batch
-#SBATCH --output=/network/rit/lab/andamlab/jose_rodrigues/e.cloacae/scripts_logfiles/amrfinderplus.slurm.%N.%j.out #Standard output
-#SBATCH --error=/network/rit/lab/andamlab/jose_rodrigues/e.cloacae/scripts_logfiles/amrfinderplus.slurm.%j.err #Standard error log
+#SBATCH --output= #Standard output
+#SBATCH --error= #Standard error log
 #SBATCH -v
 
 ########## Diplay the job context ######
@@ -17,16 +17,16 @@ echo Directory is `pwd`
 echo Using $SLURM_NTASKS processors across $SLURM_NNODES nodes
 
 ######### Assign path variables ########
-OUTPUT_DIRECTORY=/network/rit/lab/andamlab/jose_rodrigues/e.cloacae/results/amrfinderplus
-output_file="amrfinderplus_ecloacae.tsv"
+OUTPUT_DIRECTORY=
+output_file=
 
 ########## modules/env to load ###########
-source /network/rit/lab/andamlab/bin/miniconda3/etc/profile.d/conda.sh
+source 
 conda activate amrfinderplus
 umask g+rwx
 
 ####### Runninng AmrFinderPlus ##########
-python /network/rit/lab/andamlab/jose_rodrigues/e.cloacae/amrfinder.py
+python /amrfinder.py
 
 conda deactivate &&
 
