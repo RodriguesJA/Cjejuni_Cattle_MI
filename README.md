@@ -27,7 +27,7 @@ The work is a collaboration between the MDHHS and the [Manning Lab](https://mann
 
 ## Bioinformatics Drawing:
 Please see the incredibly artistic flowchart below! This flowchart has a step-by-step breakdown of the bioinformatics pipeline, including the software used, inputs, outputs, and specific files for this publication.
-![An incredibly artistic cartoon drawing of the methods description found in Rodrigues et al](bionformatics_drawing.jpg)
+![An incredibly artistic cartoon drawing of the methods description found in Rodrigues et al](bioinformatics_drawing.jpg)
 
 
 ## Software Repositories, Resources, and Tools used in this project:
