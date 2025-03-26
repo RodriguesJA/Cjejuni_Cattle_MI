@@ -1,0 +1,1910 @@
+---
+title: "Aim 3 Dissertation R Analysis, Campylobacter Cattle and Human 
+Comparative Analysis"
+---
+
+Barplot of ST and CC grouped by Cattle-derived and Human-derived isolates
+
+```{r ST and CC Figures, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+##Loading in libraries / installing packages
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+
+###setting working directory to project data folder
+#getwd()
+#setwd(choose.dir())
+#import data from RStudio fx
+
+## These data were output from mlst, which queries our genomes with the PubMLST database ##
+##setting new data variables to manpulate 
+
+my_colors <- c("cattle_percent" = "#79bd8f", "human_percent" = "#70dfec")
+dodge_width <- 0.7
+
+human_st_cc <- human_datatable
+cattle_st_cc <- cattle_datatable
+
+human_st_sum <- human_st_cc %>%
+  group_by(ST) %>%
+  summarize(human_count = n()) %>%
+  ungroup()
+
+cattle_st_sum <- cattle_st_cc %>%
+  group_by(ST) %>%
+  summarize(cattle_count = n()) %>%
+  ungroup()
+
+st_data <- full_join(human_st_sum, cattle_st_sum, by = "ST")
+st_data[is.na(st_data)] <- 0
+
+st_data <- st_data %>%
+  filter(cattle_count > 0)
+
+total_human <- sum(st_data$human_count)
+total_cattle <- sum(st_data$cattle_count)
+
+st_data <- st_data %>%
+  mutate(Rare = ifelse((human_count + cattle_count) == 1, "Rare ST", "NonRare"))
+
+rare_sts <- st_data$ST[st_data$Rare == "Rare"]
+
+print(rare_sts)
+
+human_st_cc <- human_st_cc %>%
+  mutate(ST = ifelse(ST %in% rare_sts, "Rare ST", as.character(ST)))
+
+cattle_st_cc <- cattle_st_cc %>%
+  mutate(ST = ifelse(ST %in% rare_sts, "Rare ST", as.character(ST)))
+
+# Recreating the counts with Rare STs now as a countable group
+human_st_sum2 <- human_st_cc %>%
+  group_by(ST) %>%
+  summarize(human_count = n()) %>%
+  ungroup()
+
+cattle_st_sum2 <- cattle_st_cc %>%
+  group_by(ST) %>%
+  summarize(cattle_count = n()) %>%
+  ungroup()
+
+st_data2 <- full_join(human_st_sum2, cattle_st_sum2, by = "ST")
+st_data2[is.na(st_data2)] <- 0
+
+# Calculate new percentages
+st_data2 <- st_data2 %>%
+  rowwise() %>%
+  mutate(total = human_count + cattle_count,
+         human_percent = ifelse(total == 0, 0, (human_count / total) * 100),
+         cattle_percent = ifelse(total == 0, 0, (cattle_count / total) * 100)) %>%
+  ungroup()
+  
+st_data2 <- st_data2 %>%
+  filter(cattle_count > 0)
+
+st_data_long <- st_data2 %>%
+    pivot_longer(cols = c(human_percent, cattle_percent), names_to = 'Source', values_to = 'Percent')
+  
+st_data_long <- st_data_long %>%
+    arrange(desc(total), .by_group = TRUE) %>%
+    mutate(ST = factor(ST, levels = unique(ST)))
+  
+write.csv(st_data_long, "st_data_long_check.csv", row.names = FALSE)
+
+ggplot(st_data_long, aes(x = ST, y = Percent, fill = Source)) +
+  geom_bar(stat = 'identity', position = position_dodge(width = dodge_width)) +
+  geom_text(aes(label = ifelse(Source == "human_percent", human_count, cattle_count)),
+            position = position_dodge(width = dodge_width),
+            vjust = -0.25,
+            size = 3.5,
+            color = "black") +
+  scale_fill_manual(
+    name = "Source",
+    values = my_colors,
+    labels = c("human_percent" = "Human Derived", "cattle_percent" = "Cattle Derived")
+  ) +
+  scale_y_continuous(limits = c(0,110), expand = c(0, 0)) +
+  theme_minimal() +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom",
+    axis.line = element_line(color = "black")
+  ) +
+  labs(x = 'Sequence Type (ST)', y = 'Percentage') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+##Counts and building plots for CC data ##
+
+human_cc_sum <- human_st_cc %>%
+  group_by(CC) %>%
+  summarize(human_count = n()) %>%
+  ungroup()
+
+cattle_cc_sum <- cattle_st_cc %>%
+  group_by(CC) %>%
+  summarize(cattle_count = n()) %>%
+  ungroup()
+
+cc_data <- full_join(human_cc_sum, cattle_cc_sum, by = "CC")
+
+cc_data <- cc_data %>%
+  rowwise() %>%
+  mutate(total = human_count + cattle_count, 
+         human_percent = ifelse(total == 0, 0, (human_count/ total)*100),
+         cattle_percent = ifelse(total == 0, 0, (cattle_count/ total) *100)) %>%
+  ungroup()
+
+cc_data <- cc_data %>%
+  arrange(desc(total))
+
+
+cc_data[is.na(cc_data)] <- 0
+
+cc_data_long <- cc_data %>%
+  pivot_longer(cols = c(human_percent, cattle_percent), names_to = 'Source', values_to = 'Percent')
+
+cc_data_long[is.na(cc_data_long)] <- 0
+
+cc_data_long$CC <- as.character(cc_data_long$CC)
+
+cc_data_long$CC <- case_when(
+  cc_data_long$CC == "0" ~ "CC unassigned",
+  TRUE ~ cc_data_long$CC
+)
+
+cc_data_long <- cc_data_long %>%
+  filter(cattle_count > 0 )
+
+#Plotting!#
+ggplot(cc_data_long, aes(x = CC, y = Percent, fill = Source)) +
+  geom_bar(stat = 'identity', position =  position_dodge(width = dodge_width)) +
+  geom_text(aes(y = Percent, label = ifelse(Source == "human_percent", human_count, cattle_count)),
+            position = position_dodge(width = dodge_width),
+            vjust = -0.25,
+            size = 3.5, 
+            color = "black") +
+  scale_fill_manual(
+    name = "Source",
+    values = my_colors,
+    labels = c("human_percent" = "Human Derived", "cattle_percent" = "Cattle Derived")
+  ) +
+  scale_y_continuous(limits = c(0,110), expand = c(0,0)) +
+  theme_minimal() +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom",
+    axis.line = element_line(color = "black")
+  ) + 
+  labs(x = 'Clonal Complex (CC)', y = 'Percentage') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+Venndiagram of cattle vs. human derived genes
+
+```{r Cattle vs Human derived genes, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+library(ggvenn)
+library(stringr)
+
+###setting working directory to project data folder
+#getwd()
+#setwd(choose.dir())
+#import data from RStudio fx
+
+## These data were output from Panaroo ##
+
+my_colors <- c(Cattle = "#79bd8f", Human = "#70dfec")
+
+gene_data <- gene_presence_absence
+human_isolates <- human_datatable
+cattle_isolates <- cattle_datatable
+
+human_genes <- gene_data %>%
+  select(c('Gene', human_isolates$Isolates)) %>%
+  filter(rowSums(!is.na(.)) > 1) %>%
+  pull(Gene)
+
+cattle_genes <- gene_data %>%
+  select(c('Gene', cattle_isolates$Isolates)) %>%
+  filter(rowSums(!is.na(.)) > 1) %>%
+  pull(Gene)
+
+list_genes <- list(Human = human_genes, Cattle = cattle_genes)
+ggvenn_plot <- ggvenn(list_genes)
+##Plotting
+
+ggvenn_plot + 
+  scale_fill_manual(values = my_colors) +
+  theme_minimal() +
+  labs(title = "Venn Diagram of Gene Presence in Human and Cattle Isolates")
+#Rough Venndiagram was then edited in Inkscape
+
+
+##Generating table of genes that are population specific (cattle derived vs. human derived isolates) 
+
+human_isolatesID <-human_isolates$Isolates
+cattle_isolatesID <- cattle_isolates$Isolates
+
+long_gene_data <- gene_data %>%
+  pivot_longer(cols = -c(Gene, Annotation), names_to = "Isolates", values_to = "Presence", values_drop_na = TRUE)
+
+human_specific_genes <- long_gene_data %>%
+  filter(Isolates %in% human_isolatesID) %>%
+  anti_join(long_gene_data %>% filter(Isolates %in% cattle_isolatesID), by = "Gene")
+
+cattle_specific_genes <- long_gene_data %>%
+  filter(Isolates %in% cattle_isolatesID) %>%
+  anti_join(long_gene_data %>% filter(Isolates %in% human_isolatesID), by = "Gene")
+
+human_specific_genes <- human_specific_genes %>%
+  left_join(human_isolates, by = "Isolates")
+
+cattle_specific_genes <- cattle_specific_genes %>%
+  left_join(cattle_isolates, by = "Isolates")
+
+combined_genes <- bind_rows(human_specific_genes, cattle_specific_genes) %>%
+  group_by(Gene, Annotation) %>%
+  summarise(
+    Population = ifelse(first(Isolates) %in% human_isolatesID, "Human Derived", "Cattle Derived"),
+    Isolates = toString(unique(Isolates)),
+    STs = toString(unique(ST)),
+    CCs = toString(unique(na.omit(CC))),
+    Frequency = n(),
+    .groups = 'drop'
+  )
+
+write.csv(combined_genes, "unique_population_genes.csv", row.names = FALSE)
+
+```
+Looking at the number of accessory genes per isolates by cattle and human derived isolates. 
+Core genes were defined as in 99% or > of isolates and 1320 genes were present in total
+
+```{r Violin Plot & Statistic, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+
+##Loading in libraries / installing packages
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggbeeswarm)
+
+###setting working directory to project data folder
+#getwd()
+#setwd(choose.dir())
+#import data from RStudio fx
+
+## These data were generated from Panaroo output ###
+
+my_colors <- c(Cattle = "#79bd8f", Human = "#70dfec")
+
+gene_data <- gene_presence_absence
+human_isolates <- human_datatable$Isolates
+cattle_isolates <- cattle_datatable$Isolates
+
+gene_data <- gene_data %>%
+  mutate(Total_Isolates = rowSums(select(., -Gene))) %>%
+  mutate(Percent_Presence = Total_Isolates / (ncol(.) - 2))
+
+gene_data <- gene_data %>%
+  mutate(Category = case_when(
+    Percent_Presence >= 0.99 ~ "Core", 
+    TRUE ~ "Accessory"
+  ))
+
+core_gene_count <- sum(gene_data$Category == "Core")
+cat("Number of core genes:", core_gene_count, "\n")
+#Yay! 1320 core genes were present same as Panaroo output!
+
+accessory_genes <- gene_data %>%
+  filter(Category == "Accessory") %>%
+  pivot_longer(cols = -c(Gene, Total_Isolates, Percent_Presence, Category), names_to = "Isolates", values_to = "Presence")
+
+
+accessory_gene_counts <- accessory_genes %>%
+  mutate(Source = case_when(
+    Isolates %in% human_isolates ~ "Human",
+    Isolates %in% cattle_isolates ~ "Cattle"
+  )) %>%
+  group_by(Source, Isolates) %>%
+  summarise(Accessory_Gene_Count = sum(Presence), .groups = 'drop')
+  
+            
+ggplot(accessory_gene_counts, aes(x = Source, y = Accessory_Gene_Count, fill = Source)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.2, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), shape = 21, size = 3, color = "black", fill = "white") +
+  scale_fill_manual(values = my_colors) +
+  labs(title = "Accessory Gene Counts in Human vs. Cattle Isolates",
+       x = "Source",
+       y = "Accessory Gene Count") +
+  theme_minimal() +
+  ylim(0, 700) 
+
+summary_stats <- accessory_gene_counts %>%
+  group_by(Source) %>%
+  summarise(
+    Median = median(Accessory_Gene_Count),
+    First_Quartile = quantile(Accessory_Gene_Count, 0.25),
+    Third_Quartile = quantile(Accessory_Gene_Count, 0.75)
+  )
+
+print(summary_stats)
+
+stats <- wilcox.test(Accessory_Gene_Count ~ Source, data = accessory_gene_counts)
+print(stats)
+
+
+t_test_result <- t.test(Accessory_Gene_Count ~ Source, data = accessory_gene_counts)
+t_test_result
+
+
+contingency_table <- accessory_genes %>%
+  mutate(Source = case_when(
+    Isolates %in% human_isolates ~ "Human",
+    Isolates %in% cattle_isolates ~ "Cattle"
+  )) %>%
+  group_by(Gene, Source) %>%
+  summarise(Presence = sum(Presence), .groups = 'drop') %>%
+  pivot_wider(names_from = Source, values_from = Presence, values_fill = list(Presence = 0))
+
+# Perform chi-square test
+chi_square_result <- chisq.test(contingency_table[, -1])
+print(chi_square_result)
+
+
+
+```
+AMR determinants by group cattle vs. human
+
+```{r AMR, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+
+###setting working directory to project data folder
+#getwd()
+#setwd(choose.dir())
+#import data from RStudio fx
+### These data were output from quering genomes with AMRFINDER PLUS ###
+
+amr_data <- amrfinderplus_campy
+cattle_isolates <- cattle_datatable$Isolates
+human_isolates <- human_datatable$Isolates
+
+my_colors <- c(Cattle = "#79bd8f", Human = "#70dfec")
+
+#Density plot for the # of resistance determinants 
+amr_summary <- amr_data %>%
+  mutate(Source = case_when(
+    AccessionNum %in% human_isolates ~ "Human",
+    AccessionNum %in% cattle_isolates ~ "Cattle"
+  )) %>%
+  group_by(AccessionNum, Source) %>%
+  summarise(Resistance_Count = n(), .groups = 'drop')
+
+write.csv(amr_summary, "amr_summary.csv", row.names = FALSE)
+
+resistance_count <- ggplot(amr_summary, aes(x = Resistance_Count,  fill = Source)) +
+  geom_density(alpha = 0.5) +
+  scale_x_continuous(limits = c(0,10), breaks =1:10) +
+  scale_y_continuous(limits= c(0.0, 0.7))+
+  scale_fill_manual(values = my_colors) +
+  labs(title = "Density of Antibiotic Resistance Determinants",
+       x = "Number of Antibiotic Resistance Determinants",
+       y = "Density") +
+  theme_minimal()
+
+print(resistance_count)
+
+ggsave("arg_count.svg", plot = resistance_count, device = "svg")
+
+#Ceating bar plots of the mechanisms of resistance
+resistance_summary <- amr_data %>%
+  mutate(Source = case_when(
+    AccessionNum %in% human_isolates ~ "Human",
+    AccessionNum %in% cattle_isolates ~ "Cattle"
+  )) %>%
+  group_by(AccessionNum, Source) %>%
+  group_by(Class, Gene_symbol, Source) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+resistance_summary <- resistance_summary %>%
+  mutate(Gene_symbol = fct_reorder(Gene_symbol, Count, .fun = sum))
+
+write.csv(resistance_summary, "resistance_summary.csv", row.names = FALSE)
+#creating a seperate graph for beta-lactams as there are a variety of mechanisms
+ggplot(subset(resistance_summary, Class == "BETA-LACTAM"), #Replace here for other graphs 
+       aes(x = Count, y = Gene_symbol, fill = Source)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = my_colors) +
+  labs(title = "Specific Antibiotic Resistance by Mechanism",
+       x = "Number of Isolates",
+       y = "Mechanism") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1))
+
+#One graph for tetracycline, quinolone and macrolides here
+selected_classes <- c("TETRACYCLINE", "QUINOLONE", "MACROLIDE")
+
+resistance_summary_x2 <- resistance_summary %>%
+  filter(Class %in% selected_classes) %>%
+  mutate(Class_Mechanism = paste(Class, Gene_symbol, sep = ": ")) %>%
+  mutate(Class_Mechanism = fct_reorder(Class_Mechanism, Count, .fun = sum))
+         
+ggplot(resistance_summary_x2, aes(y = Class_Mechanism, x = Count, fill = Source)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = my_colors) +
+  scale_x_continuous(limits = c(0,150)) +
+  labs(title = "Antibiotic resistance by Mechanism and Class",
+        x = "Number of Isolates",
+        y =  "Mechanism")+
+  theme_minimal() + 
+  theme(axis.text.y = element_text(angle = 0, hjust = 1))
+
+#Got a table of percent based on the total # of amr mechanisms identified
+
+resistance_summary_x3 <- amr_data %>%
+  mutate(Source = case_when(
+    AccessionNum %in% human_isolates ~ "Human",
+    AccessionNum %in% cattle_isolates ~ "Cattle"
+  )) %>%
+  group_by(Class, Gene_symbol, Source) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+total_counts <- resistance_summary_x3 %>%
+  group_by(Source) %>%
+  summarise(Total = sum(Count))
+
+resistance_summary_x3 <- resistance_summary_x3 %>%
+  left_join(total_counts, by = "Source") %>%
+  mutate(Percentage = Count/ Total * 100)
+
+write.csv(resistance_summary_x3, "percent_positive_amr_mechanism.csv", row.names = FALSE)
+
+#here graphing % of isolates that are positive for a particular resistance determinant within a class and grouped by Source
+#i.e. cattle vs. human derived isolates
+
+resistance_summary_class <- amr_data %>%
+  mutate(Source = case_when(
+    AccessionNum %in% human_isolates ~ "Human",
+    AccessionNum %in% cattle_isolates ~ "Cattle"
+  )) %>%
+  group_by(Class, Source) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+total_counts_class <- resistance_summary_class %>%
+  group_by(Class) %>%
+  summarise(Total = sum(Count), .groups = 'drop')
+
+resistance_summary_class <- resistance_summary_class %>%
+  left_join(total_counts_class, by = "Class") %>%
+  mutate(Percentage = Count/ Total * 100)
+
+write.csv(resistance_summary_class, "percent_positive_per_class.csv", row.names = FALSE)
+
+ggplot(resistance_summary_class, aes(x = Class, y = Percentage, fill = Source)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = my_colors) +
+  labs(
+    title = "Percentage of Each  Resistance Class by Source",
+    x = "Class",
+    y = "Percentage (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+amr_summary_classes <- amr_data %>%
+  mutate(Source = case_when(
+    AccessionNum %in% human_isolates ~ "Human",
+    AccessionNum %in% cattle_isolates ~ "Cattle"
+  )) %>%
+  group_by(AccessionNum, Source) %>%
+  summarise(Resistance_classes = n_distinct(Class), .groups = 'drop')
+
+write.csv(amr_summary_classes, "amr_summary_classses.csv", row.names = FALSE)
+
+mdr_isolates <- amr_summary_classes %>%
+  filter(Resistance_classes > 3)
+
+print(mdr_isolates)
+
+amr_data_mdr <- amr_data %>%
+  filter(AccessionNum %in% mdr_isolates$AccessionNum)
+
+write.csv(amr_data_mdr, "amr_data_mdr.csv", row.names = FALSE)
+
+arg_resistance_classes <- ggplot(amr_summary_classes, aes(x = Resistance_classes, fill = Source)) +
+  geom_density(alpha = 0.5) +
+  scale_x_continuous(limits = c(0, 10), breaks = 0:10) +
+  scale_fill_manual(values = my_colors) +
+  labs(
+    title = "Density of Antibiotic Resistance Classes",
+    x = "Number of Antibiotic Resistance Classes",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+ggsave("arg_classes.svg", plot = arg_resistance_classes, device = "svg")
+```
+Silhouette analysis of the hierarachial clustering for National/Global analysis:
+  
+These data were generated from BIGSdb through PubMLST functionality. ST-982  human and cattle genomes (from Michigan - our studies) were 
+uploaded to PubMLST a query was run based on the sequence type. cgMLST profiles and minimum spanning tree was generated
+based on the cgMLST profiles. ReproTree was used to generate clusters via hierachial clustering on the cgMLST hamming distance derived from cgmlst-dist
+which is implemented in ReporTree. Here we are using the clustering assignment and the hamming distance matrix from cg-mlst dists to conduct a Silhouette 
+analysis. Clusters with the highest Silouette (max) and negative Silouette area (min) will be selected. Additional data from ReproTree will be used to identify areas 
+of cluster stability. The cluster selected based on cluster stability, and silouette analysis  will then be visualized with the cgMLST minimum spanning tree. 
+These defined clusters will then be used in futher analysis to evaluate phylogeography and epidemiologic/statisicial associations based on the cgMLST HC within ST-982 .
+
+```{r Clusters, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+library(tidyverse)
+library (dplyr)
+library(cluster)
+###setting working directory to project data folder
+#getwd()
+#setwd(choose.dir())
+#import data from RStudio fx
+
+#for the distance matrix need the row names to be the first column (not 1, 2, 3 etc.)
+dist_data <- BIGSdb_dist_hamming
+colnames(dist_data) <- sub("^X", "", colnames(dist_data))
+
+sample_ids <- rownames(dist_data)
+write.csv(sample_ids, "sample_ids.csv", row.names = FALSE)
+
+#dist_matrix cleaves rows and column names
+dist_matrix <- as.dist(dist_data)
+
+#cleaning and reordering clustering data to match cleaned distance matrix
+cluster_data <- BIGSdb_clusterComposition
+colnames(cluster_data) <- sub("^X.", "", colnames(cluster_data))
+
+#ensuring unique cluster_ids in cluster id including singletons
+all_partitions_transformed <- data.frame()
+
+cluster_id_counter <- 0
+
+for(partition in unique(cluster_data$partition)) {
+  partition_data <- cluster_data[cluster_data$partition == partition, ]
+  
+  partition_data <- partition_data %>%
+    mutate(ordering_id = as.numeric(sub(".*_([0-9]+)$", "\\1", cluster)))
+  
+  partition_data <- partition_data %>%
+    arrange(ordering_id)
+  
+  partition_data <- partition_data %>%
+    mutate(cluster_id = match(cluster, unique(cluster)))
+  
+  partition_long <- partition_data %>%
+    separate_rows(samples, sep = ",") %>%
+    mutate(samples = trimws(samples))
+
+  all_partitions_transformed <- rbind(all_partitions_transformed, partition_long)
+}
+
+write.csv(all_partitions_transformed, "all_partitions_transformed.csv", row.names = FALSE)
+
+#slightly computationally intensive step of ordering 
+#here reordering the clustering data to match the data in the distance matrix (sample_ids variable)
+  
+unique_partitions <- unique(all_partitions_transformed$partition)
+total_partitions <- length(unique_partitions)
+
+output_file_path <- "all_partitions_reordered.csv"  
+
+for(partition in unique(all_partitions_transformed$partition)) {
+  partition_data <- all_partitions_transformed %>%
+    filter(partition == partition, samples %in% sample_ids) %>%
+    arrange(match(samples, sample_ids))
+  
+  if(partition == unique(all_partitions_transformed$partition)[1]) {
+    write.csv(partition_data, file = output_file_path, row.names = FALSE)
+  } else {
+    write.csv(partition_data, file = output_file_path, row.names = FALSE, append = TRUE)
+  }
+}
+
+#re-import the reordered csv here...
+
+cluster_data_final <- all_partitions_reordered
+
+##Here we are running the silhouette analysis on each of the clusters identified in the data
+winning_interation <- NULL
+max_silhouette_avg <- -Inf
+min_neg_silhouette_area <- -Inf
+
+silhouette_results <- data.frame(
+    Partition = character(),
+    AvgSilhouetteScore = numeric(),
+    NegSilhouetteArea = numeric(),
+    stringsAsFactors = FALSE
+  )
+  
+  for (i in seq_along(unique_partitions)) {
+    partition <- unique_partitions[i]
+    
+    # Report progress
+    cat(sprintf("Analyzing partition %s (%d of %d)\n", partition, i, total_partitions))
+    
+    current_partition_data <- cluster_data_final[cluster_data_final$partition == partition, ]
+ 
+    # Check if there are at least 2 different clusters
+    if (length(unique(current_partition_data$cluster_id)) < 2) {
+      cat("Not enough clusters in partition", partition, "to calculate silhouette scores.\n")
+      next  # Skip this iteration
+    }
+    # Perform silhouette analysis
+    silhouette_scores <- silhouette(current_partition_data$cluster_id, dist_matrix)
+    avg_silhouette_score <- mean(silhouette_scores[, "sil_width"], na.rm = TRUE)
+    neg_silhouette_area <- sum(silhouette_scores[silhouette_scores[, "sil_width"] < 0, "sil_width"], na.rm = TRUE)
+    
+    if (avg_silhouette_score > max_silhouette_avg || neg_silhouette_area < min_neg_silhouette_area) {
+      winning_interation <- partition
+      max_silhouette_avg <- avg_silhouette_score
+      min_neg_silhouette_area <- neg_silhouette_area
+    }
+    silhouette_results <- rbind(silhouette_results, data.frame(
+      Partition = partition,
+      AvgSilhouetteScore = avg_silhouette_score,
+      NegSilhouetteArea = neg_silhouette_area
+    ))
+  }
+
+write.csv(silhouette_results, "silhouette_analysis_results_outliers_excluded.csv", row.names = FALSE)
+##based on the stability regions and clustering data here, partition or iteration #94 was chosen
+## criteria included partition where >1 cluster had >1 isolate, and in a stability region AND Silhouette analysis
+````
+ReproTree, ST-982 clustering by HHS regions
+
+```{r Clusters vs. region analysis, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+library(tidyverse)
+library (dplyr)
+library(broom)
+library(purrr)
+library(tidyr)
+library(ggplot2)
+###setting working directory to project data folder
+#getwd()
+#setwd(choose.dir())
+#import data from RStudio fx
+
+
+#Defining US State Region (HHS Regions)
+region_1 <- c("CT", "ME", "MA", "NH", "RI", "VT" )
+region_2 <- c("NJ", "NY","PR", "VI")
+region_3 <- c("DE", "DC", "MD", "PA","VA", "WV")
+region_4 <- c("AL", "FL", "GA", "KY", "MS", "NC", "SC", "TN")
+region_5 <- c("IL", "IN", "MI", "MN", "OH", "WI")
+region_6 <- c("AR", "LA", "NM", "OK", "TX")
+region_7 <- c("IA", "KS", "MO", "NE")
+region_8 <- c("CO", "MT", "ND", "SD", "UT", "WY")
+region_9 <- c("AZ", "CA", "HI", "NV", "AS", "MP", "TT")
+region_10 <- c("AL", "ID", "OR", "WA")
+#HHS regions: https://www.hhs.gov/about/agencies/iea/regional-offices/index.html
+
+my_colors <- c('Cluster 1'= '#63BB70', 'Cluster 2' = '#7CCEFD', 'Cluster 3' = '#FF5252', 'Cluster 4' = '#9574CD', 'Singleton' = '#58585A', 'Cluster 5' = '#FFF175', 'Cluster 6' = '#F44ED8', 'Cluster 7' = '#F77D55')
+
+#selected single-94x1.0 partition from previous cluster analysis (above)
+# Only using a sub-set of complete data here and in subsequent analyses below... n=723 
+cluster_data_final <- all_partitions_reordered
+selected_parition <- cluster_data_final %>%
+  filter(partition == "single-94x1.0")
+
+metadata <- metadata_global
+
+combined_data <- metadata %>%
+                 left_join(selected_parition %>% select(samples, cluster_id), by = c("ID" = "samples"))
+
+#cleaning metadata from isolates
+combined_data <- combined_data %>%
+  mutate(region = ifelse(grepl("Michigan", region), "MI", region))
+
+combined_data <- combined_data %>%
+  mutate(region = ifelse(grepl("Georgia", region), "GA", region))
+
+combined_data <- combined_data %>%
+  mutate (US_region = case_when(
+    region %in% region_1 ~ "Region 1",
+    region %in% region_2 ~ "Region 2",
+    region %in% region_3 ~ "Region 3",
+    region %in% region_4 ~ "Region 4",
+    region %in% region_5 ~ "Region 5",
+    region %in% region_6 ~ "Region 6",
+    region %in% region_7 ~ "Region 7",
+    region %in% region_8 ~ "Region 8",
+    region %in% region_9 ~ "Region 9",
+    region %in% region_10 ~ "Region 10",
+  ))  
+
+#Removing NA georgraphic location samples
+clean_combined_data <- combined_data %>%
+  filter(!is.na(cluster_id) & !is.na(US_region))
+
+clean_combined_data <- clean_combined_data %>%
+  add_count(cluster_id) %>%
+  mutate(cluster_id = ifelse(n == 1, "Singleton", as.character(cluster_id))) %>%
+  select(-n)  
+
+#Renaming clusters cluster 1 -> 7 + Singletons
+
+cluster_ranks <- clean_combined_data %>%
+  filter(cluster_id != "Singleton") %>%
+  count(cluster_id) %>%
+  arrange(desc(n)) %>%
+  mutate(rank = row_number(), 
+         new_cluster_id = paste("Cluster", rank)) %>%
+  select(-n)
+
+clean_combined_data <- clean_combined_data %>%
+  left_join(cluster_ranks, by = "cluster_id") %>%
+  mutate(cluster_id = ifelse(cluster_id != "Singleton", new_cluster_id, cluster_id)) %>%
+  select(-rank, -new_cluster_id)
+
+write.csv(clean_combined_data, "clean_combined_data.csv", row.names = FALSE)
+
+#summarizing data for charts, table and analysis
+region_cluster_summary <- clean_combined_data %>%
+  group_by(US_region, cluster_id) %>%
+  summarise( count = n()) %>%
+  ungroup()
+
+region_totals <- clean_combined_data %>%
+  group_by(US_region) %>%
+  summarise(total_samples = n())
+
+region_cluster_summary <- clean_combined_data %>%
+  group_by(US_region, cluster_id) %>%
+  summarise(cluster_samples = n()) %>%
+  left_join(region_totals, by = "US_region") %>%
+  mutate(percentage = (cluster_samples / total_samples) * 100) %>%
+  ungroup()
+
+region_cluster_summary <- region_cluster_summary %>%
+  mutate(percentage_display = paste0(round(percentage, 2), "% (n = ", cluster_samples, ")"))
+
+region_cluster_summary
+
+write.csv(region_cluster_summary, "region_cluster_summary.csv", row.names = FALSE)
+
+#function to create piecharts 
+ create_pie_chart_for_region <- function(region_name, data) {
+   region_data <- filter(region_cluster_summary, US_region == region_name)
+   ggplot(region_data, aes(x = "", y = cluster_samples, fill = as.factor(cluster_id))) +
+     geom_bar(width = 1, stat = "identity", color = "black") +
+     geom_text(aes(label = percentage_display),
+               color = "white", size = 3) +
+     coord_polar("y", start = 0) +
+     scale_fill_manual(values = my_colors) +
+     theme_void() +
+     labs(title = paste("Cluster Distribution in", region_name), fill = "Cluster ID") +
+     guides(fill = guide_legend(title = "Cluster ID"))
+ }
+
+#change [name] here to get pie chart from the different regions
+create_pie_chart_for_region( ["Region 1"], region_cluster_summary)
+
+
+```
+Generating results region vs. cluster
+
+```{r odds ration for regions vs cluster, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(forcats)
+
+#[import clean_combined_data]
+
+unique_clusters <- unique(clean_combined_data$cluster_id)
+unique_regions <- unique(clean_combined_data$US_region)
+
+combinations <- expand.grid(cluster = unique_clusters, region = unique_regions)
+
+#Function to caclulate odds ratio##
+calculate_odds_ratio <- function(cluster, region, data) {
+ 
+  cluster_presence <- data$cluster_id == cluster
+  region_presence <- data$US_region == region
+  
+  contingency_table <- table(cluster_presence, region_presence)
+  
+  if (all(dim(contingency_table) == c(2, 2))) {
+    fisher_test <- fisher.test(contingency_table)
+    odds_ratio <- fisher_test$estimate
+    conf.low <- fisher_test$conf.int[1]
+    conf.high <- fisher_test$conf.int[2]
+    p.value <- fisher_test$p.value
+  } else {
+    # Assign NA if table is not 2x2
+    odds_ratio <- NA
+    conf.low <- NA
+    conf.high <- NA
+    p.value <- NA
+  }
+  
+  # Return results
+  return(data.frame(cluster = cluster, region = region, 
+                    odds_ratio = odds_ratio, 
+                    conf.low = conf.low, conf.high = conf.high, 
+                    p.value = p.value))
+}
+
+
+
+results <- purrr::pmap_df(combinations, ~ calculate_odds_ratio(..1, ..2, clean_combined_data))
+
+# Benjamini-Hochberg correction for p-values
+results <- results %>%
+  mutate(p.value.adj = p.adjust(p.value, method = "BH"))
+
+
+results
+write.csv(results, "results_region_vs_cluster.csv", row.names = FALSE)
+
+#Created a table.
+```
+Evaluation of cluster vs. time
+
+```{r Clusters v. time, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+
+filtered_data_time <- combined_data %>%
+  group_by(cluster_id) %>%
+  filter(n() >= 10) %>%
+  ungroup()
+
+time_summary <- filtered_data_time %>%
+  group_by(year, cluster_id) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+ggplot(time_summary, aes(x = year, y = count, group = cluster_id, color = cluster_id)) +
+  geom_line() +
+  labs(x = "Year", y = "Count", title = "Time Trend of Each Cluster") +
+  theme_minimal()+
+  ylim(0,100)
+
+binary_data <- filtered_data_time %>%
+  mutate(presence = 1) %>%
+  complete(year, cluster_id, fill = list(presence = 0))
+
+# Logistic regression for each cluster
+trend_results <- binary_data %>%
+  group_by(cluster_id) %>%
+  do(tidy(glm(presence ~ year, data = ., family = binomial()))) %>%
+  ungroup()
+
+# View trend results
+trend_results
+write.csv(trend_results, "trend_results_time.csv", row.names = FALSE)
+
+###No changes overtime from each of the clusters
+
+```
+genome size vs. time/cluster ; evaluation of genome size. The hypothesis here is that ST-982 might represent 
+another evolving lineage similar to CC-61 which is a cattle associated lineage that has show specialization through gene loss. 
+ST-982 is closely related to CC-61 phylogenetically. Therefore specialization will be assessed by average genome size per year
+
+```{r genomes size vs. time & time, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+
+genome_data <- BIGSdb_genome_data
+meta_data <- clean_combined_data
+
+genome_data_1<- genome_data %>% select(Isolate, Total.length)
+meta_data_1 <- meta_data %>% select(isolate, year)
+
+meta_data_1 <- meta_data_1 %>% rename(Isolate = isolate)
+
+merged_data <- merge(genome_data_1,meta_data_1, by="Isolate")
+
+merged_data <- merged_data %>%
+              filter(!is.na(Total.length) &!is.na(year))
+
+filtered_data <- merged_data %>%
+  group_by(year) %>%
+  filter(n() > 50) %>%
+  ungroup()
+
+average_genome_size <- filtered_data %>% 
+  group_by(year) %>% 
+  summarize(average_size = mean(Total.length))
+
+model <- lm(average_size ~ year, data = average_genome_size)
+summary(model)
+
+ggplot(average_genome_size, aes(x = year, y = average_size)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Average Genome Size Over Time",
+       x = "Year",
+       y = "Average Genome Size")
+# No relationship between average_genome_size and year...
+#genome size does not differ don't have data on # of coding sequences but 
+# that could be a more sensitive test ...
+
+genome_data_2<- genome_data %>% select(Isolate, Total.length)
+meta_data_2 <- meta_data %>% select(isolate, cluster_id)
+
+meta_data_2 <- meta_data_2 %>% rename(Isolate = isolate)
+
+merged_data_2 <- merge(genome_data_2,meta_data_2, by="Isolate")
+
+merged_data_2 <- merged_data_2 %>%
+  filter(!is.na(Total.length) &!is.na(cluster_id))
+
+filtered_data_2 <- merged_data_2 %>%
+  group_by(cluster_id) %>%
+  filter(n() > 50) %>%
+  ungroup()
+
+filtered_data_2 <- filtered_data_2 %>%
+  filter(cluster_id %in% c("Cluster 1", "Cluster 2"))
+
+t_test_result <- t.test(Total.length ~ cluster_id, data = filtered_data_2)
+t_test_result
+
+my_colors <- c('Cluster 1'= '#63BB70', 'Cluster 2' = '#7CCEFD')
+
+ggplot(filtered_data_2, aes(x = cluster_id, y = Total.length, fill = cluster_id)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.2, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), shape = 21, size = 3, color = "black", fill = "white") +
+  scale_fill_manual(values = my_colors) + 
+  labs(title = "Genome Size Distribution by Cluster",
+       x = "Cluster ID",
+       y = "Genome Size") +
+  theme_minimal() +
+  ylim(1400000, 2000000) 
+
+summary_stats <- filtered_data_2 %>%
+  group_by(cluster_id) %>%
+  summarise(
+    Median = median(Total.length),
+    First_Quartile = quantile(Total.length, 0.25),
+    Third_Quartile = quantile(Total.length, 0.75)
+  )
+
+print(summary_stats)
+
+stats <- wilcox.test(Total.length ~ cluster_id, data = filtered_data_2)
+print(stats) #Wilcox since the data is not normally distributed
+
+##Cluster 2 has bigger genomes! interesting! No relationship between time and cluster or time and genome size...
+# See above. Could point to diversification/acquisition of MGEs ?
+```
+Measures of alpha diversity v. time/region/cluster
+Here looking at cg-mlst profiles and to determine diversity within Cluster 1 and 2 and cgmlst profile diversity
+across time and region. Using 436 alleles to assess diversity that were present in the full dataset 1152 ST-982 isolates
+then narrowed that to 723 isolates that have complete metadata. 
+
+```{r alpha diversity v. time/region/cluster, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+#clean combined (ID, year, cluster_id and US_region)
+# Again only looking at "complete" records here...
+
+library(vegan)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+
+#Alpha Diversity...
+meta_data <-clean_combined_data
+cgmlst <- BIGSdb_profiles
+#import with "-" as NA or Missing...
+
+na_columns<- cgmlst %>%
+  select(-1) %>%
+  summarise_all(~sum(is.na(.))) %>%
+  select_if(~any(.)) %>%
+  names()
+
+#reimport with cgmlst rownames as column 1 for later merge to work...
+cgmlst <- BIGSdb_profiles
+#707 alleles have some missing data...
+
+cgmlst_clean <- cgmlst %>%
+  select(-all_of(na_columns))
+
+#436 alleles assessed with complete data across the entire dataset...
+
+shannon_diversity <- diversity(cgmlst_clean, index = "shannon")
+simpson_diversity <- diversity(cgmlst_clean, index = "simpson")
+
+
+
+alpha_diversity <- data.frame(Isolate_ID = rownames(cgmlst_clean),
+                              shannon = shannon_diversity, simpson = simpson_diversity)
+
+
+meta_data <- meta_data %>% select(ID, year, cluster_id, US_region)
+
+meta_data <- meta_data %>% rename(Isolate_ID = ID)
+
+merged_data <- merge(meta_data,alpha_diversity, by= "Isolate_ID")
+
+merged_data <- merged_data %>%
+  filter(!is.na(year) &!is.na(US_region))
+
+write.csv(merged_data, "alpha_diversity.csv", row.names = FALSE)
+
+#stats and visualization for alpha diversity metrics
+
+
+## Alpha diversity vs. Time
+merged_data$year <- as.factor(merged_data$year)
+
+year_count <- merged_data %>% group_by(year) %>% summarise(count = n())
+years_to_keep <- year_count %>% filter(count >= 10) %>% select(year)
+
+alpha_diversity_final <- merged_data %>% filter(year %in% years_to_keep$year)
+
+shannon_aov <- aov(shannon ~ year, data = alpha_diversity_final)
+summary(shannon_aov)
+
+TukeyHSD(shannon_aov) #<- post-hoc analysis for the ANOVA
+
+simpson_aov <- aov(simpson ~ year, data = alpha_diversity_final)
+summary(simpson_aov)
+
+TukeyHSD(simpson_aov) 
+
+ggplot(alpha_diversity_final, aes(x = year, y = shannon, group = year)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Shannon Diversity Index Over Time",
+       x = "Year",
+       y = "Shannon Index") +
+  ylim(2,6)
+  
+  
+ggplot(alpha_diversity_final, aes(x = year, y = simpson, group = year)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Simpson Diversity Index Over Time",
+       x = "Year",
+       y = "Simpson Index") +
+  ylim(0.7,1)
+
+#Alpha Diversity vs. Cluster
+cluster_count <- alpha_diversity_final %>% group_by(cluster_id) %>% summarise(count = n())
+clusters_to_keep <- cluster_count %>% filter(count >= 10) %>% select(cluster_id)
+
+alpha_diversity_cluster <- alpha_diversity_final %>% filter(cluster_id %in% clusters_to_keep$cluster_id)
+
+shannon_aov_cluster <- aov(shannon ~ cluster_id, data = alpha_diversity_cluster)
+summary(shannon_aov_cluster)
+TukeyHSD(shannon_aov_cluster)
+
+simpson_aov_cluster <- aov(simpson ~ cluster_id, data = alpha_diversity_cluster)
+summary(simpson_aov_cluster)
+TukeyHSD(simpson_aov_cluster) 
+
+
+ggplot(alpha_diversity_cluster, aes(x = cluster_id, y = shannon, group = cluster_id)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Shannon Diversity Index by Cluster",
+       x = "Cluster ID",
+       y = "Shannon Index") +
+  ylim(2,6)
+
+ggplot(alpha_diversity_cluster, aes(x = cluster_id, y = simpson, group = cluster_id)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Simpson Diversity Index by Cluster",
+       x = "Cluster ID",
+       y = "Simpson Index") +
+  ylim(0.7,1)
+
+#Alpha Diversity vs. Region
+region_count <- alpha_diversity_final %>% group_by(US_region) %>% summarise(count = n())
+regions_to_keep <- region_count %>% filter(count >= 10) %>% select(US_region)
+
+alpha_diversity_region <- alpha_diversity_final %>% filter(US_region %in% regions_to_keep$US_region)
+
+# ANOVA for Shannon Index by region
+shannon_aov_region <- aov(shannon ~ US_region, data = alpha_diversity_region)
+summary(shannon_aov_region)
+
+# ANOVA for Simpson Index by region
+simpson_aov_region <- aov(simpson ~ US_region, data = alpha_diversity_region,
+                          
+summary(simpson_aov_region)
+
+region_order <- c("Region 1", "Region 2", "Region 3", "Region 4", "Region 5", "Region 6",
+                  "Region 7", "Region 8", "Region 9", "Region 10")
+
+alpha_diversity_region$US_region <- factor(alpha_diversity_region$US_region, levels = region_order)
+
+# Boxplot for Shannon Index by region
+ggplot(alpha_diversity_region, aes(x = US_region, y = shannon, group = US_region)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Shannon Diversity Index by Region",
+       x = "US Region",
+       y = "Shannon Index") +
+  ylim(2,6)
+
+# Boxplot for Simpson Index by region
+ggplot(alpha_diversity_region, aes(x = US_region, y = simpson, group = US_region)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Simpson Diversity Index by Region",
+       x = "US Region",
+       y = "Simpson Index") +
+  ylim(0.7, 1)
+
+
+```
+Measures of beta diversity v. time/region/cluster
+Here looking at cg-mlst profiles and to determine diversity within Cluster 1 and 2 and cgmlst profile diversity
+across time, region and cluster. Here  using Jaccard distance presence/absence of unique alleles from the 436 
+unique alleles identified
+
+```{r Clusters v. time/region/cluster, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+
+library(vegan)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+#intermediate file for here... matricies complicating rownames... 
+write.csv(cgmlst_clean, "allele_data.csv", row.names = TRUE)
+
+
+pa_data <- data.frame(Isolate_ID = allele_data[[1]])
+rm(allele_data)
+#reimport allele_data with rownames as first column 
+
+for (allele in names(allele_data)) {
+  
+  unique_variants <- unique(allele_data[[allele]][allele_data[[allele]] > 0])
+  
+  for (variant in unique_variants) {
+    new_col_name <- paste(allele, "allele", variant, sep = "_")
+    pa_data[[new_col_name]] <- ifelse(allele_data[[allele]] == variant, 1, 0)
+  }
+}
+
+meta_data <-clean_combined_data
+
+meta_data <- meta_data %>% select(ID, year, cluster_id, US_region)
+
+meta_data <- meta_data %>% rename(Isolate_ID = ID)
+
+filtered_pa_data <- pa_data %>% 
+  filter(Isolate_ID %in% meta_data$Isolate_ID)
+
+filtered_pa_data[is.na(filtered_pa_data)] <- 0
+
+write.csv(filtered_pa_data, "allele_presence_absence.csv", row.names = FALSE)
+
+#reimport allele_presence_absence data w/ rownames as first column
+
+jaccard_dist <- vegdist(allele_presence_absence, method = "jaccard", na.rm = TRUE)
+
+jaccard_dist
+
+pcoa_jaccard <- cmdscale(jaccard_dist, eig = TRUE, k = 2)
+
+pcoa_jaccard_df <- as.data.frame(pcoa_jaccard$points)
+colnames(pcoa_jaccard_df) <- c("PC1", "PC2")
+
+pcoa_jaccard_df$Isolate_ID <- rownames(pcoa_jaccard_df)
+
+pcoa_metadata <- merge(pcoa_jaccard_df, meta_data, by = "Isolate_ID")
+
+pcoa_metadata_filtered <- pcoa_metadata %>% filter(cluster_id != "Singleton")
+
+my_colors <- c('Cluster 1'= '#63BB70', 'Cluster 2' = '#7CCEFD', 'Cluster 3' = '#FF5252', 'Cluster 4' = '#9574CD', 'Singleton' = '#58585A', 'Cluster 5' = '#FFF175', 'Cluster 6' = '#F44ED8', 'Cluster 7' = '#F77D55')
+
+ggplot(pcoa_metadata_filtered, aes(x = PC1, y = PC2, color = cluster_id)) +
+  geom_point() +
+  stat_ellipse(type = "t", linetype = 2, level = 0.95)  +
+  theme_minimal() +
+  labs(titel = "PCoA of Jaccard Distance by Cluster",
+  x = "PC1",
+  y =  "PC2") + 
+  scale_color_manual(values = my_colors)
+
+#No differences between Region vs. Year....
+
+region_colors <- c('Region 1'= '#63BB70', 'Region 2' = '#7CCEFD', 'Region 3' = '#FF5252', 'Region 4' = '#9574CD', 'Region 5' = '#58585A', 'Region 6' = '#FFF175', 'Region 7' = '#F44ED8', 'Region 8' = '#F77D55', 'Region 9' = '#F77D55', 'Region 10' = '#F77D55' )
+
+ggplot(pcoa_metadata_filtered, aes(x = PC1, y = PC2, color = US_region)) +
+  geom_point() +
+  stat_ellipse(type = "t", linetype = 2, level = 0.95)  +
+  theme_minimal() +
+  labs(titel = "PCoA of Jaccard Distance by Region",
+       x = "PC1",
+       y =  "PC2", 
+       color = "US Region") + 
+  scale_color_manual(values = region_colors)
+
+
+permanova_result <- adonis2(jaccard_dist ~ cluster_id, data = meta_data, method = "jaccard")
+
+# View PERMANOVA results
+permanova_result
+
+write.csv(meta_data, "meta_data.csv", row.names = FALSE)
+
+
+
+{r, leave one out appoarch for logistic regression analysis, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE }
+
+library(tidyverse)
+library(broom)
+library(ggplot2)
+library(brglm2)
+library(car)
+library(gt)
+library(patchwork)
+
+logit_campy_data <- clean_combined_data %>%
+  mutate(
+    Cluster_1 = ifelse(cluster_id == "Cluster 1", 1, 0),
+    Cluster_2 = ifelse(cluster_id == "Cluster 2", 1, 0),
+    Cluster_3 = ifelse(cluster_id == "Cluster 3", 1, 0),
+    Cluster_4 = ifelse(cluster_id == "Cluster 4", 1, 0),
+    Cluster_5 = ifelse(cluster_id == "Cluster 5", 1, 0),
+    Cluster_6 = ifelse(cluster_id == "Cluster 6", 1, 0),
+    Cluster_7 = ifelse(cluster_id == "Cluster 7", 1, 0),
+    Singleton = ifelse(cluster_id == "Singleton", 1, 0),
+    Region_1 = ifelse(US_region == "Region 1", 1, 0),
+    Region_2 = ifelse(US_region == "Region 2", 1, 0),
+    Region_3 = ifelse(US_region == "Region 3", 1, 0),
+    Region_4 = ifelse(US_region == "Region 4", 1, 0),
+    Region_5 = ifelse(US_region == "Region 5", 1, 0),
+    Region_6 = ifelse(US_region == "Region 6", 1, 0),
+    Region_7 = ifelse(US_region == "Region 7", 1, 0),
+    Region_8 = ifelse(US_region == "Region 8", 1, 0),
+    Region_9 = ifelse(US_region == "Region 9", 1, 0),
+    Region_10 = ifelse(US_region == "Region 10", 1, 0)
+  )
+
+write.csv(logit_campy_data, "logit_data_check.csv", row.names = FALSE)
+
+# data is formated correctly...
+
+# building models...including brglm2 which is a package to that helps to reduce bias in logistic regression
+# deals with complete or quas-complete seperation
+
+Cluster_1_models <- list(
+  Region_1 = glm(Cluster_1 ~ Region_1, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_2 = glm(Cluster_1 ~ Region_2, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_3 = glm(Cluster_1 ~ Region_3, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_4 = glm(Cluster_1 ~ Region_4, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_5 = glm(Cluster_1 ~ Region_5, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_6 = glm(Cluster_1 ~ Region_6, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_7 = glm(Cluster_1 ~ Region_7, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_8 = glm(Cluster_1 ~ Region_8, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_9 = glm(Cluster_1 ~ Region_9, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_10 = glm(Cluster_1 ~ Region_10, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit")
+)
+
+
+Cluster_2_models <- list(
+  Region_1 = glm(Cluster_2 ~ Region_1, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_2 = glm(Cluster_2 ~ Region_2, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_3 = glm(Cluster_2 ~ Region_3, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_4 = glm(Cluster_2 ~ Region_4, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_5 = glm(Cluster_2 ~ Region_5, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_6 = glm(Cluster_2 ~ Region_6, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_7 = glm(Cluster_2 ~ Region_7, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_8 = glm(Cluster_2 ~ Region_8, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_9 = glm(Cluster_2 ~ Region_9, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_10 = glm(Cluster_2 ~ Region_10, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit")
+)
+
+
+Cluster_3_models <- list(
+  Region_1 = glm(Cluster_3 ~ Region_1, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_2 = glm(Cluster_3 ~ Region_2, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_3 = glm(Cluster_3 ~ Region_3, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_4 = glm(Cluster_3 ~ Region_4, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_5 = glm(Cluster_3 ~ Region_5, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_6 = glm(Cluster_3 ~ Region_6, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_7 = glm(Cluster_3 ~ Region_7, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_8 = glm(Cluster_3 ~ Region_8, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_9 = glm(Cluster_3 ~ Region_9, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_10 = glm(Cluster_3 ~ Region_10, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit")
+)
+
+
+Cluster_4_models <- list(
+  Region_1 = glm(Cluster_4 ~ Region_1, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_2 = glm(Cluster_4 ~ Region_2, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_3 = glm(Cluster_4 ~ Region_3, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_4 = glm(Cluster_4 ~ Region_4, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_5 = glm(Cluster_4 ~ Region_5, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_6 = glm(Cluster_4 ~ Region_6, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_7 = glm(Cluster_4 ~ Region_7, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_8 = glm(Cluster_4 ~ Region_8, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_9 = glm(Cluster_4 ~ Region_9, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_10 = glm(Cluster_4 ~ Region_10, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit")
+)
+
+
+Cluster_5_models <- list(
+  Region_1 = glm(Cluster_5 ~ Region_1, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_2 = glm(Cluster_5 ~ Region_2, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_3 = glm(Cluster_5 ~ Region_3, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_4 = glm(Cluster_5 ~ Region_4, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_5 = glm(Cluster_5 ~ Region_5, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_6 = glm(Cluster_5 ~ Region_6, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_7 = glm(Cluster_5 ~ Region_7, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_8 = glm(Cluster_5 ~ Region_8, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_9 = glm(Cluster_5 ~ Region_9, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_10 = glm(Cluster_5 ~ Region_10, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit")
+)
+
+
+Cluster_6_models <- list(
+  Region_1 = glm(Cluster_6 ~ Region_1, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_2 = glm(Cluster_6 ~ Region_2, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_3 = glm(Cluster_6 ~ Region_3, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_4 = glm(Cluster_6 ~ Region_4, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_5 = glm(Cluster_6 ~ Region_5, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_6 = glm(Cluster_6 ~ Region_6, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_7 = glm(Cluster_6 ~ Region_7, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_8 = glm(Cluster_6 ~ Region_8, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_9 = glm(Cluster_6 ~ Region_9, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_10 = glm(Cluster_6 ~ Region_10, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit")
+)
+
+
+Cluster_7_models <- list(
+  Region_1 = glm(Cluster_7 ~ Region_1, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_2 = glm(Cluster_7 ~ Region_2, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_3 = glm(Cluster_7 ~ Region_3, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_4 = glm(Cluster_7 ~ Region_4, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_5 = glm(Cluster_7 ~ Region_5, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_6 = glm(Cluster_7 ~ Region_6, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_7 = glm(Cluster_7 ~ Region_7, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_8 = glm(Cluster_7 ~ Region_8, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_9 = glm(Cluster_7 ~ Region_9, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_10 = glm(Cluster_7 ~ Region_10, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit")
+)
+
+Singleton_models <- list(
+  Region_1 = glm(Singleton ~ Region_1, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_2 = glm(Singleton ~ Region_2, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_3 = glm(Singleton~ Region_3, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_4 = glm(Singleton ~ Region_4, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_5 = glm(Singleton ~ Region_5, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_6 = glm(Singleton ~ Region_6, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_7 = glm(Singleton ~ Region_7, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_8 = glm(Singleton ~ Region_8, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_9 = glm(Singleton ~ Region_9, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit"),
+  Region_10 = glm(Singleton ~ Region_10, family = binomial(link = "logit"), data = logit_campy_data, method = "brglmFit")
+)
+
+
+
+format_p_value <- function(x) {
+  ifelse(x < 0.001, format(x, scientific = TRUE, digits = 2), scales::number(x, accuracy = 0.001))
+}
+
+cluster_1_summaries <- lapply(names(Cluster_1_models), function(region) {
+  tidy(Cluster_1_models[[region]], conf.int = TRUE) %>%
+    mutate(Cluster = "Cluster 1", Region = gsub("_", " ", region))
+}) %>%
+  bind_rows() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Odds_Ratio = exp(estimate),
+    CI = paste0("(", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), ")"),
+    p.value = format_p_value(p.value)
+  )
+
+cluster_2_summaries <- lapply(names(Cluster_2_models), function(region) {
+  tidy(Cluster_2_models[[region]], conf.int = TRUE) %>%
+    mutate(Cluster = "Cluster 2", Region = gsub("_", " ", region))
+}) %>%
+  bind_rows() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Odds_Ratio = exp(estimate),
+    CI = paste0("(", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), ")"),
+    p.value = format_p_value(p.value)
+  )
+
+cluster_3_summaries <- lapply(names(Cluster_3_models), function(region) {
+  tidy(Cluster_3_models[[region]], conf.int = TRUE) %>%
+    mutate(Cluster = "Cluster 3", Region = gsub("_", " ", region))
+}) %>%
+  bind_rows() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Odds_Ratio = exp(estimate),
+    CI = paste0("(", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), ")"),
+    p.value = format_p_value(p.value)
+  )
+
+
+cluster_4_summaries <- lapply(names(Cluster_4_models), function(region) {
+  tidy(Cluster_4_models[[region]], conf.int = TRUE) %>%
+    mutate(Cluster = "Cluster 4", Region = gsub("_", " ", region))
+}) %>%
+  bind_rows() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Odds_Ratio = exp(estimate),
+    CI = paste0("(", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), ")"),
+    p.value = format_p_value(p.value)
+  )
+
+
+cluster_5_summaries <- lapply(names(Cluster_5_models), function(region) {
+  tidy(Cluster_5_models[[region]], conf.int = TRUE) %>%
+    mutate(Cluster = "Cluster 5", Region = gsub("_", " ", region))
+}) %>%
+  bind_rows() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Odds_Ratio = exp(estimate),
+    CI = paste0("(", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), ")"),
+    p.value = format_p_value(p.value)
+  )
+
+cluster_6_summaries <- lapply(names(Cluster_5_models), function(region) {
+  tidy(Cluster_6_models[[region]], conf.int = TRUE) %>%
+    mutate(Cluster = "Cluster 6", Region = gsub("_", " ", region))
+}) %>%
+  bind_rows() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Odds_Ratio = exp(estimate),
+    CI = paste0("(", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), ")"),
+    p.value = format_p_value(p.value)
+  )
+
+
+cluster_7_summaries <- lapply(names(Cluster_5_models), function(region) {
+  tidy(Cluster_7_models[[region]], conf.int = TRUE) %>%
+    mutate(Cluster = "Cluster 7", Region = gsub("_", " ", region))
+}) %>%
+  bind_rows() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Odds_Ratio = exp(estimate),
+    CI = paste0("(", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), ")"),
+    p.value = format_p_value(p.value)
+  )
+
+
+singleton_summaries <- lapply(names(Singleton_models), function(region) {
+  tidy(Singleton_models[[region]], conf.int = TRUE) %>%
+    mutate(Cluster = "Cluster 7", Region = gsub("_", " ", region))
+}) %>%
+  bind_rows() %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    Odds_Ratio = exp(estimate),
+    CI = paste0("(", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), ")"),
+    p.value = format_p_value(p.value)
+  )
+
+
+Region_colors <- c("Region 1" = "#85755dff", 
+                   "Region 2" = "#a8486cff", 
+                   "Region 3" = "#393d6cff", 
+                   "Region 4" = "#ca4848ff",
+                   "Region 5" = "#317788ff", 
+                   "Region 6"  = "#64780bff", 
+                   "Region 7" = "#fcae17ff", 
+                   "Region 8" = "#76518fff", 
+                   "Region 9" =  "#932924ff", 
+                   "Region 10" = "#127ab5ff"
+                   )
+
+cluster_1_summaries <- cluster_1_summaries %>%
+  mutate(term = gsub("_", " ", term))
+
+cluster_2_summaries <- cluster_2_summaries %>%
+  mutate(term = gsub("_", " ", term))
+
+cluster_3_summaries <- cluster_3_summaries %>%
+  mutate(term = gsub("_", " ", term))
+
+cluster_4_summaries <- cluster_4_summaries %>%
+  mutate(term = gsub("_", " ", term))
+
+cluster_5_summaries <- cluster_5_summaries %>%
+  mutate(term = gsub("_", " ", term))
+
+cluster_6_summaries <- cluster_6_summaries %>%
+  mutate(term = gsub("_", " ", term))
+
+cluster_7_summaries <- cluster_7_summaries %>%
+  mutate(term = gsub("_", " ", term))
+
+singleton_summaries <- singleton_summaries %>%
+  mutate(term = gsub("_", " ", term))
+
+
+create_forest_plot <- function(data, cluster_name) {
+
+  data <- data %>%
+    mutate(p.value = as.numeric(p.value))
+  
+  data %>%
+    filter(p.value < 0.05) %>%
+    ggplot(aes(x = reorder(term, estimate), y = exp(estimate), color = term)) +
+    geom_point() +
+    geom_hline(yintercept = 1, linetype = "dashed") +
+    geom_errorbar(aes(ymin = exp(conf.low), ymax = exp(conf.high)), width = 0.2) +
+    coord_flip() +
+    labs(y = "Odds Ratio", title = paste("Forest Plot for", cluster_name)) +
+    theme_minimal() + 
+    theme(legend.position = "none", axis.title.y = element_blank(), axis.ticks.y = element_blank()) +
+    scale_y_continuous(limits = c(0, 5.5)) +
+    scale_color_manual(values = Region_colors)
+}
+
+cluster_1_plot <- create_forest_plot(cluster_1_summaries, "Cluster 1")
+cluster_2_plot <- create_forest_plot(cluster_2_summaries, "Cluster 2")
+cluster_3_plot <- create_forest_plot(cluster_3_summaries, "Cluster 3")
+cluster_4_plot <- create_forest_plot(cluster_4_summaries, "Cluster 4")
+cluster_5_plot <- create_forest_plot(cluster_5_summaries, "Cluster 5")
+cluster_6_plot <- create_forest_plot(cluster_6_summaries, "Cluster 6")
+cluster_7_plot <- create_forest_plot(cluster_7_summaries, "Cluster 7")
+singleton_plot <- create_forest_plot(singleton_summaries, "Singleton")
+
+Checking Plots
+print(cluster_1_plot)  # Cluster 1-3 are the only ones with more than 1 significant association
+
+combined_plot <- (cluster_1_plot | cluster_2_plot)
+
+
+print(combined_plot)
+
+
+cluster_total <- logit_campy_data %>%
+  summarise(
+    Cluster_1 = sum(Cluster_1),
+    Cluster_2 = sum(Cluster_2),
+    Cluster_3 = sum(Cluster_3),
+    Cluster_4 = sum(Cluster_4),
+    Cluster_5 = sum(Cluster_5),
+    Cluster_6 = sum(Cluster_6),
+    Cluster_7 = sum(Cluster_7),
+    Singleton = sum(Singleton)
+  )
+
+region_totals_cluster_1 <- logit_campy_data %>%
+  filter(Cluster_1 == 1) %>%
+  summarise(across(starts_with("Region"), sum)) %>%
+  pivot_longer(cols = everything(), names_to = "Region", values_to = "Total") %>%
+  mutate(Region = gsub("_", " ", Region)) 
+  
+  
+
+cluster_1_summaries <- cluster_1_summaries %>%
+  mutate(term = gsub("_", " ", term)) %>%
+  left_join(region_totals_cluster_1, by = c("term" = "Region")) %>%
+  mutate(term = paste0(term, " (n=", Total, ")")) %>%
+  select(-Total)
+
+
+region_totals_cluster_2 <- logit_campy_data %>%
+  filter(Cluster_2 == 1) %>%
+  summarise(across(starts_with("Region"), sum)) %>%
+  pivot_longer(cols = everything(), names_to = "Region", values_to = "Total") %>%
+  mutate(Region = gsub("_", " ", Region)) 
+
+
+
+cluster_2_summaries <- cluster_2_summaries %>%
+  mutate(term = gsub("_", " ", term)) %>%
+  left_join(region_totals_cluster_2, by = c("term" = "Region")) %>%
+  mutate(term = paste0(term, " (n=", Total, ")")) %>%
+  select(-Total)
+
+
+
+
+##Change gt for cluster 2
+
+gt_cluster_table <- cluster_1_summaries %>%
+  select(term, Odds_Ratio, CI, p.value) %>%
+  gt() %>%
+  tab_header(
+    title = md(paste("Cluster 1 Analysis (n=", cluster_total$Cluster_1, ")", sep = ""))
+  ) %>%
+  cols_label(
+    term = "Region",
+    Odds_Ratio = "Odds Ratio",
+    CI = "95% CI",
+    p.value = "P-Value"
+  ) %>%
+  tab_spanner(
+    label = "Cluster Analysis",
+    columns = c(Odds_Ratio, CI, p.value)
+  ) %>%
+  tab_options(
+    table.font.names = "sans-serif",
+    table.font.size = px(12)
+  )
+
+
+gt_cluster_table_2 <- cluster_2_summaries %>%
+  select(term, Odds_Ratio, CI, p.value) %>%
+  gt() %>%
+  tab_header(
+    title = md(paste("Cluster 2 Analysis (n=", cluster_total$Cluster_2, ")", sep = ""))
+  ) %>%
+  cols_label(
+    term = "Region",
+    Odds_Ratio = "Odds Ratio",
+    CI = "95% CI",
+    p.value = "P-Value"
+  ) %>%
+  tab_spanner(
+    label = "Cluster Analysis",
+    columns = c(Odds_Ratio, CI, p.value)
+  ) %>%
+  tab_options(
+    table.font.names = "sans-serif",
+    table.font.size = px(12)
+  )
+
+
+print(gt_cluster_table_2)
+
+
+{r, viruelence factors by sourec, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE }
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+
+# of virulence genes violin plot 
+
+v_data <- virulence_results %>%
+  rename(AccessionNum = 1)%>%
+  mutate(AccessionNum = str_extract(AccessionNum, "TW\\d+"))
+
+human_tw_n <- human_datatable$Isolates
+cattle_tw_n <- cattle_datatable$Isolates
+
+v_data <- v_data %>%
+  mutate(Source = case_when(
+    AccessionNum %in% human_tw_n ~ "Human",
+    AccessionNum %in% cattle_tw_n ~ "Cattle",
+    TRUE ~ "Unknown"))
+
+v_counts <- v_data %>%
+  group_by(AccessionNum, Source) %>%
+  summarise(Virulence_gene_count = n(), .groups = 'drop')
+
+write.csv(v_counts, "v_counts.csv", row.names = FALSE)
+
+ggplot(v_counts, aes(x = Source, y = Virulence_gene_count, fill = Source)) +
+  geom_violin(trim = FALSE) + 
+  geom_boxplot(width = 0.2, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), shape = 21, size = 3, color = "black", fill = "white") +
+  scale_fill_manual(values = c("Cattle" = "#79bd8f", "Human" = "#70dfec")) +
+  labs(title = "Number of Virulence Genes per Source",
+       x = "Source",
+       y = "Number of Virulence Genes") +
+  theme_minimal()
+
+t_test_result <- t.test(Virulence_gene_count ~ Source, data = v_counts)
+print(t_test_result)
+
+wilcox_test_result <- wilcox.test(Virulence_gene_count ~ Source, data = v_counts)
+print(wilcox_test_result)
+
+
+unique_product_names <- unique(v_data$PRODUCT)
+
+print(unique_product_names)
+
+#creating functional classes for virulence gene data... 
+
+v_data <- v_data %>%
+  mutate(Function_class = case_when(
+    str_detect(PRODUCT, "Flagella") ~ "Flagella",
+    str_detect(PRODUCT, "Capsule") ~ "Capsule",
+    str_detect(PRODUCT, "LOS") ~ "LOS",
+    str_detect(PRODUCT, "CDT") ~ "CDT",
+    str_detect(PRODUCT, "chemotaxis") ~ "Chemotaxis",
+    str_detect(PRODUCT, "Type IV secretion system") ~ "Type IV Secretion System",
+    str_detect(PRODUCT, "adhesin|fimbriae|pilus") ~ "Adhesins",
+    TRUE ~ "Other"
+  ))
+
+write.csv(v_data, "check_virulence.csv", row.names = FALSE)
+
+class_v_counts <- v_data %>%
+  group_by(Source, Function_class) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+total_counts <- class_v_counts %>%
+  group_by(Function_class) %>%
+  summarise(Total_count = sum(Count), .groups = 'drop')
+
+class_v_percent <- class_v_counts %>%
+  left_join(total_counts, by = "Function_class") %>%
+  mutate(Percent = (Count/Total_count) *100) %>%
+  select(-Total_count)
+
+ggplot(class_v_percent, aes(x = Function_class, y = Percent, fill = Source)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("Cattle" = "#79bd8f", "Human" = "#70dfec")) +
+  labs(title = "Distribution of Functional Classes of Virulence Genes by Source",
+       x = "Functional Class",
+       y = "Percentage of Virulence Genes") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+contingency_tables <- class_v_percent %>%
+  pivot_wider(names_from = Source, values_from = c(Count, Percent), values_fill = list(Count = 0, Percent = 0)) %>%
+  mutate(Total = Count_Human + Count_Cattle)
+
+total_counts_source <- v_data %>%
+  group_by(Source) %>%
+  summarise(Total_Count = n(), .groups = 'drop')
+
+total_human <- total_counts_source %>% filter(Source == "Human") %>% pull(Total_Count)
+total_cattle <- total_counts_source %>% filter(Source == "Cattle") %>% pull(Total_Count)
+
+
+chi_square_results <- contingency_tables %>%
+  rowwise() %>%
+  mutate(
+    Chi_Square_Test = list(
+      chisq.test(matrix(c(Count_Human, total_human - Count_Human, Count_Cattle, total_cattle - Count_Cattle), nrow = 2))
+    )
+  ) %>%
+  mutate(
+    Chi_Square_Statistic = Chi_Square_Test$statistic,
+    Chi_Square_P_Value = Chi_Square_Test$p.value,
+    Chi_Square_Expected = list(Chi_Square_Test$expected)
+  ) %>%
+  select(Function_class, Chi_Square_Statistic, Chi_Square_P_Value, Chi_Square_Expected)
+
+chi_square_summary <- chi_square_results %>%
+  mutate(Significant = Chi_Square_P_Value < 0.05) %>%
+  select(Function_class, Chi_Square_Statistic, Chi_Square_P_Value, Significant)
+
+print(chi_square_summary)
+
+
+#scatter plot of the genes... 
+
+fill_color <- "#c3aed6"
+
+gene_counts <- v_data %>%
+  group_by(GENE, Source) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  pivot_wider(names_from = Source, values_from = Count, values_fill = list(Count = 0)) %>%
+  rename(Cattle_count = Cattle, Human_count = Human)
+
+
+ggplot(gene_counts, aes(x = Human_count, y = Cattle_count)) +
+  geom_point(color = "black", fill = fill_color, size = 5, shape = 21) +
+  labs(title = "Virulence Gene Counts by Source",
+       x = "Count in Human Genomes",
+       y =  "Count in Cattle Genomes") + 
+  theme_minimal() +
+  scale_x_continuous(limits = c(0,250)) +
+  scale_y_continuous(limits = c(0, 110))
+
+
+write.csv(gene_counts, "virulence_gene_counts.csv", row.names = FALSE)
+
+
+{r, plasmid data, echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE }
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+
+#  of plasmids per genome 
+
+plasmids <- merged_mobtyper_results 
+
+plasmids <- plasmids %>%
+  mutate(TW_number = str_extract(sample_id, "TW\\d+")) %>%
+  group_by(TW_number) %>%
+  summarise(Plasmid_count = n()) %>%
+  ungroup()
+
+human_isolates <- human_datatable %>%
+  select(Isolates) %>%
+  mutate(Source = "Human")
+
+cattle_isolates <- cattle_datatable %>%
+  select(Isolates) %>%
+  mutate(Source = "Cattle")
+
+combined_isolates <- bind_rows(human_isolates, cattle_isolates) %>%
+  rename(TW_number = Isolates)
+
+plasmids_data <- combined_isolates %>%
+  left_join(plasmids, by = "TW_number") %>%
+  replace_na(list(Plasmid_count = 0))
+
+my_colors <- c(Cattle = "#79bd8f", Human = "#70dfec")
+
+ggplot(plasmids_data, aes(x = Source, y = Plasmid_count, fill = Source)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.2, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), shape = 21, size = 3, color = "black", fill = "white") +
+  scale_fill_manual(values = my_colors) +
+  labs(title = "Number of Plasmids in Human vs. Cattle Isolates",
+       x = "Source",
+       y = "Number of Plasmids") +
+  theme_minimal() +
+  ylim(0, 5)
+
+t_test_result <- t.test(Plasmid_count ~ Source, data = plasmids_data)
+print(t_test_result)
+
+wilcox_test_result <- wilcox.test(Plasmid_count ~ Source, data = plasmids_data)
+print(wilcox_test_result)
+
+plasmids_tree_data <- merged_mobtyper_results
+
+plasmids_tree_data <- plasmids_tree_data %>%
+  mutate(TW_number = str_extract(sample_id, "TW\\d+"))
+
+
+plasmids_tree_data <- combined_isolates %>%
+  left_join(plasmids_tree_data, by = "TW_number")
+
+plasmids_tree_data <- plasmids_tree_data %>%
+  mutate(
+    pVIR = ifelse(primary_cluster_id %in% c("AE190", "AE015"), 1, 0)
+  ) %>%
+  mutate(
+    p118 = ifelse(primary_cluster_id == "AC439", 1, 0 )
+  ) %>%
+  mutate(
+    pCJDM = ifelse(primary_cluster_id == "AC321", 1, 0)
+  ) %>%
+  mutate(
+    pTET = ifelse(primary_cluster_id== "AC320", 1, 0)
+  )
+
+out_data <- plasmids_tree_data %>%
+  select(TW_number, Source, predicted_mobility, primary_cluster_id, pVIR, p118, pCJDM, pTET)
+
+write.csv(out_data, "plasmids_presence_absence.csv", row.names = FALSE)
+
+Figure in ITOL for the rest...
+
