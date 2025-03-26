@@ -1,0 +1,25 @@
+#!/bin/bash --login
+ 
+########## Define Resources Needed with SBATCH Lines ##########
+#SBATCH --time=24:00:00		
+#SBATCH --ntasks=1		    
+#SBATCH --cpus-per-task=10	
+#SBATCH --mem=50G     		
+#SBATCH --job-name=QUAST_Cattle_Annotations(no_plots)
+#SBATCH --account=Manning	
+
+########## Modules to Load ##########
+
+module load GNU/6.4.0-2.28  
+module load OpenMPI/4.0.3
+module load GCC/9.3.0 
+module load iccifort/2020.1.217 
+module load impi/2019.7.217
+module load matplotlib/3.2.1-Python-3.8.2
+module load QUAST/5.0.0
+
+########## Code to Run ###########
+
+cd /mnt/home/rodri651/
+cd /mnt/gs18/scratch/groups/manninglab/
+python QUAST_JAR_2021.py
