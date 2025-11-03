@@ -1,4 +1,4 @@
-# Evidence of diversification and geographic separation in sequence type (ST)-982, a lineage of *Campylobacter jejuni* co-circulating in cattle and humans
+# Evidence of diversification and geographic separation in a lineage of *Campylobacter jejuni* co-circulating in cattle and humans
 <a id="Description:"><a/>
 <a id="Data Availability:"><a/>
 <a id="Key Features:"><a/>
