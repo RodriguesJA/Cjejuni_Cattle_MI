@@ -9,7 +9,7 @@
 **Scripts and public data for comparative phylogenomics of *C. jejuni* between cattle and humans Rodrigues et al.**
 
 ## Description:
-This repository contains the scripts utilized for bioinformatics and statistical analysis associated with []().
+This repository contains the scripts used for bioinformatics and statistical analysis associated with [Rodrigues et al. (Microbial Genomics, 2025)](https://www.microbiologyresearch.org/content/journal/mgen/10.1099/mgen.0.001553).
 The work is a collaboration between the MDHHS and the [Manning Lab](https://manninglab.natsci.msu.edu/) at Michigan State University.
 
 ## Data Availability: 
